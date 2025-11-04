@@ -12,16 +12,22 @@ import HeightLimit from '../height_limit_scrollable/heightLimit';
 import { useRouter } from 'next/navigation';
 import { RefreshContext } from '@/app/_contexts/refresh';
 import { useNotifications } from '@/app/_contexts/notification';
+import SimpleCheckbox from '../ui/simple_checkbox';
+import QuestionMark from '../svg/question-mark';
+import { Tooltip } from '../ui/tooltip';
 
 export default function Data() {
    const [hw, setHw] = useState('50vh');
    // const smRatio = 297;
    // const lgRatio = 0.218;
    const smRatio = 180;
-   const lgRatio = 0.07;
+   const lgRatio = 0.09;
    const [statData, setStatData] = useState([]);
+   const [trueStatData, setTrueStatData] = useState([]);
    const [name, setName] = useState('');
    const [threshold, setThreshold] = useState(0);
+   const [isTrueAttendance, setIsTrueAttendance] = useState(false);
+   const [displayStat, setDisplayStat] = useState([]);
    const { refreshCont } = useContext(RefreshContext);
    const router = useRouter();
    const { addNotification } = useNotifications();
@@ -56,7 +62,55 @@ export default function Data() {
                addNotification('Request setup failed. Please try again.');
             }
          });
+      axios
+         .get(API_BASE_URL + '/current', { headers: header })
+         .then((response) => {
+            if (response.status === 200) {
+               setTrueStatData(response.data);
+            } else {
+               addNotification('Unexpected server response.');
+            }
+         })
+         .catch((error) => {
+            if (error.response) {
+               if (error.response.status === 401) {
+                  addNotification('Session expired. Redirecting to login...');
+                  router.push('/login');
+               } else {
+                  addNotification('Server error while fetching true stats.');
+               }
+            } else if (error.request) {
+               addNotification(
+                  'No response from server. Check your connection.'
+               );
+            } else {
+               addNotification('Request setup failed. Please try again.');
+            }
+         });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [refreshCont]);
+
+   useEffect(() => {
+      if (isTrueAttendance) {
+         const transformedData = trueStatData.map((item) => {
+            const attended = item.classes_present;
+            const bunked = item.bunks_taken;
+            const totalClasses = attended + bunked;
+            const bunksAvailable = Math.floor(
+               (totalClasses * (100 - threshold)) / 100 - bunked
+            );
+
+            return {
+               name: item.name,
+               percentage: item.current_percentage,
+               bunks_available: bunksAvailable,
+            };
+         });
+         setDisplayStat(transformedData);
+      } else {
+         setDisplayStat(statData);
+      }
+   }, [isTrueAttendance, trueStatData, statData, threshold]);
 
    useEffect(() => {
       HeightLimit({ setHw, smRatio, lgRatio });
@@ -111,25 +165,61 @@ export default function Data() {
                );
             }
          });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, []);
 
    const avg = (key) => {
       let sum = 0;
-      statData.forEach((sub) => {
+      displayStat.forEach((sub) => {
          sum += sub[key];
       });
-      return key == 'percentage' ? (sum / statData.length).toFixed(0) : sum;
+      return key == 'percentage' ? (sum / displayStat.length).toFixed(0) : sum;
    };
 
    return (
       <div
-         className="no-scrollbar mx-[3vw] flex h-full flex-1 flex-col overflow-auto font-light max-sm:m-5 max-sm:mb-0"
+         className="no-scrollbar mx-[3vw] mt-[2vw] flex h-full flex-1 flex-col overflow-auto font-light max-sm:m-5 max-sm:mb-0"
          style={{ height: hw }}
       >
          <div className="sticky top-0 bg-[#1c1c1c]">
-            <div className="mb-0 max-sm:mb-2">
-               <div className="text-[6vw] max-sm:text-6xl">
+            <div className="max-sm:mb-2">
+               <div className="text-[6vw] leading-[6vw] max-sm:text-6xl">
                   <ExpandableName name={name} />
+               </div>
+               <div className="my-[0.75vw] flex justify-start">
+                  <div
+                     className={`flex items-center gap-x-[0.5vw] rounded-[2vw] p-[1vw] max-sm:gap-x-1 max-sm:rounded-2xl max-sm:px-2 ${isTrueAttendance ? 'bg-[#272727]' : ''}`}
+                  >
+                     <SimpleCheckbox
+                        checked={isTrueAttendance}
+                        setChecked={setIsTrueAttendance}
+                     />
+                     <p className="text-[1.5vw] max-sm:text-lg">
+                        Show True Attendance
+                     </p>
+                     <Tooltip
+                        props={
+                           <div className="flex size-[1.5vw] text-[#727272] max-sm:size-5">
+                              <QuestionMark />
+                           </div>
+                        }
+                        tooltip={
+                           <p>
+                              <strong>True attendance</strong> is your current
+                              attendance right now, not the expected one by the
+                              end of the term. <br />
+                              <br />
+                              For example, if a semester has 20 classes in total
+                              and you&apos;ve attended 7 out of the 10 classes
+                              conducted so far (3 bunks), your overall
+                              attendance would be calculated as{' '}
+                              <code>(10 + 7) / 20 = 85%</code>&nbsp;, but your
+                              true attendance would be &nbsp;
+                              <code>7 / 10 = 70%</code>.
+                           </p>
+                        }
+                     />
+                  </div>
                </div>
             </div>
             <div className="flex">
@@ -171,7 +261,7 @@ export default function Data() {
                // style={{ height: hw }}
             >
                <Graph
-                  statData={statData}
+                  statData={displayStat}
                   threshold={threshold}
                   setThreshold={setThreshold}
                />
@@ -190,7 +280,7 @@ function ExpandableName({ name }) {
          onClick={() => setExpanded(!expanded)}
       >
          <p
-            className={`w-full max-w-[90vw] overflow-hidden text-ellipsis ${
+            className={`w-full max-w-[90vw] overflow-hidden text-ellipsis md:max-w-[60vw] ${
                expanded
                   ? 'whitespace-normal'
                   : 'min-h-[67px] overflow-x-hidden whitespace-nowrap'

@@ -62,7 +62,7 @@ export default function NavBar() {
          });
    }
    return (
-      <nav className="flex h-[5vw] max-sm:h-[72px] max-sm:pt-3 max-sm:px-3">
+      <nav className="flex h-[5vw] max-sm:h-[72px] max-sm:px-3 max-sm:pt-3">
          <div className="mb-2 flex h-[5vw] flex-1 items-center p-[1vw] text-[2vw] max-sm:h-[72px] max-sm:flex-1 max-sm:text-3xl">
             <Image
                src={Logo}

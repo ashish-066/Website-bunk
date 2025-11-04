@@ -7,7 +7,7 @@ import { API_BASE_URL, ACCESS_TOKEN_NAME } from '@/app/_utils/api_constants';
 import axios from 'axios';
 import Image from 'next/image';
 import { useNotifications } from '@/app/_contexts/notification';
-import { NOTIF_TYPE } from '../_enums/notification';
+import { NOTIF_TYPE } from '@/app/_enums/notification';
 
 export default function Dashboard() {
    const router = useRouter();
@@ -24,8 +24,8 @@ export default function Dashboard() {
          .get(API_BASE_URL + '/courses', { headers: header })
          .then(function (response) {
             if (response.status === 200) {
-               router.push('/dashboard/home');
                setProgress(1);
+               router.push('/dashboard/home');
             }
          })
          .catch(function (error) {
